@@ -1,0 +1,295 @@
+/*********************************************************************
+*          Portions COPYRIGHT 2013 STMicroelectronics                *
+*          Portions SEGGER Microcontroller GmbH & Co. KG             *
+*        Solutions for real time microcontroller applications        *
+**********************************************************************
+*                                                                    *
+*        (c) 1996 - 2013  SEGGER Microcontroller GmbH & Co. KG       *
+*                                                                    *
+*        Internet: www.segger.com    Support:  support@segger.com    *
+*                                                                    *
+**********************************************************************
+
+** emWin V5.22 - Graphical user interface for embedded applications **
+All  Intellectual Property rights  in the Software belongs to  SEGGER.
+emWin is protected by  international copyright laws.  Knowledge of the
+source code may not be used to write a similar product.  This file may
+only be used in accordance with the following terms:
+
+The  software has  been licensed  to STMicroelectronics International
+N.V. a Dutch company with a Swiss branch and its headquarters in Plan-
+les-Ouates, Geneva, 39 Chemin du Champ des Filles, Switzerland for the
+purposes of creating libraries for ARM Cortex-M-based 32-bit microcon_
+troller products commercialized by Licensee only, sublicensed and dis_
+tributed under the terms and conditions of the End User License Agree_
+ment supplied by STMicroelectronics International N.V.
+Full source code is available at: www.segger.com
+
+We appreciate your understanding and fairness.
+----------------------------------------------------------------------
+File        : GUIDEMO_Speed.c
+Purpose     : Speed demo
+----------------------------------------------------------------------
+*/
+
+/**
+  ******************************************************************************
+  * @file    GUIDEMO_Speed.c
+  * @author  MCD Application Team
+  * @version V1.1.1
+  * @date    15-November-2013
+  * @brief   Speed demo
+  ******************************************************************************
+  * @attention
+  *
+  * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
+  * You may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at:
+  *
+  *        http://www.st.com/software_license_agreement_liberty_v2
+  *
+  * Unless required by applicable law or agreed to in writing, software 
+  * distributed under the License is distributed on an "AS IS" BASIS, 
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  *
+  ******************************************************************************
+  */
+
+
+#include <stdlib.h>  /* for rand */
+
+//#include "GUIDEMO.h"
+#include "GUI.h"
+#include "DIALOG.h"
+#include "ili93xx.h"
+
+//#if (SHOW_GUIDEMO_SPEED)
+#if (1)
+
+/*********************************************************************
+*
+*       Static data
+*
+**********************************************************************
+*/
+static const GUI_COLOR _aColor[8] = {
+  0x000000, 
+  0x0000FF, 
+  0x00FF00, 
+  0x00FFFF, 
+  0xFF0000, 
+  0xFF00FF, 
+  0xFFFF00, 
+  0xFFFFFF
+};
+
+/*********************************************************************
+*
+*       Static code
+*
+**********************************************************************
+*/
+static int     _HaltTime;
+static int     _HaltTimeStart;
+static int     _Halt;
+int GUIDEMO_GetTime(void) {
+  return _Halt ? _HaltTimeStart : GUI_GetTime() - _HaltTime;
+}
+
+void GUIDEMO_AddStringToString(char * pText, const char * acAdd) {
+  int i;
+  int j;
+
+  i = 0;
+  j = 0;
+  while (*(pText + i)) {
+    i++;
+  }
+  while (*(acAdd + j)) {
+    *(pText + i) = *(acAdd + j);
+    i++;
+    j++;
+  }
+  *(pText + i) = '\0';
+}
+
+void GUIDEMO_AddIntToString(char * pText, unsigned int Number) {
+  int TextLen;
+  int LenNum;
+  int i;
+
+  TextLen = 0;
+  while (*(pText + TextLen)) {
+    TextLen++;
+  }
+  i       = 1;
+  LenNum  = 1;
+  while ((Number / i) >= 10) {
+    i *= 10;
+    LenNum++;
+  }
+  *(pText + TextLen + LenNum) = '\0';
+  while (LenNum) {
+    *(pText + TextLen + LenNum - 1) = '0' + Number % 10;
+    Number /= 10;
+    LenNum--;
+  }
+}
+/*********************************************************************
+*
+*       _GetPixelsPerSecond
+*/
+static U32 _GetPixelsPerSecond(void) {
+  GUI_COLOR Color, BkColor;
+  U32 x0, y0, x1, y1, xSize, ySize;
+  I32 t, t0;
+  U32 Cnt, PixelsPerSecond, PixelCnt;
+
+  //
+  // Find an area which is not obstructed by any windows
+  //
+  xSize   = LCD_GetXSize();
+  ySize   = LCD_GetYSize();
+  Cnt     = 0;
+  x0      = 15;
+  x1      = xSize - 15;
+  y0      = ((ySize - GUI_GetFontSizeY()) >> 1) - 5;
+  y1      = ((ySize - GUI_GetFontSizeY()) >> 1) + GUI_GetFontSizeY() + 5;
+  Color   = GUI_GetColor();
+  BkColor = GUI_GetBkColor();
+  GUI_SetColor(0xAAAAAA);
+  //
+  // Repeat fill as often as possible in 100 ms
+  //
+  t0 = GUIDEMO_GetTime();
+  do {
+    GUI_FillRect(x0, y0, x1, y1);
+    Cnt++;
+    t = GUIDEMO_GetTime();    
+  } while ((t - (t0 + 100)) <= 0);
+  //
+  // Compute result
+  //
+  t -= t0;
+  PixelCnt = (x1 - x0 + 1) * (y1 - y0 + 1) * Cnt;
+  PixelsPerSecond = PixelCnt / t * 1000;   
+  GUI_SetColor(Color);
+  return PixelsPerSecond;
+}
+
+/*********************************************************************
+*
+*       Public code
+*
+**********************************************************************
+*/
+/*********************************************************************
+*
+*       GUIDEMO_Speed
+*/
+void GUIDEMO_Speed(void) {
+  int      TimeStart, i;
+  U32      PixelsPerSecond;
+  unsigned aColorIndex[8];
+  int      xSize, ySize, vySize;
+  GUI_RECT Rect, ClipRect;
+  char     cText[40] = { 0 };
+  WM_HWIN videoWin;
+  U32 x0, y0, x1, y1;
+  
+  videoWin = WM_CreateWindow(0,0,lcddev.width,lcddev.height,WM_CF_SHOW|WM_CF_STAYONTOP,NULL,0);
+  WM_SelectWindow(videoWin);
+  GUI_SetBkColor(GUI_BLACK);
+  GUI_Clear();
+  GUI_SetFont(&GUI_Font16_ASCII);
+  
+  x0      = 15;
+  x1      = LCD_GetXSize() - 15;
+  y0      = ((LCD_GetYSize() - GUI_GetFontSizeY()) >> 1) - 5;
+  y1      = ((LCD_GetYSize() - GUI_GetFontSizeY()) >> 1) + GUI_GetFontSizeY() + 5;
+  
+  xSize  = LCD_GetXSize();
+  ySize  = LCD_GetYSize();
+  vySize = LCD_GetVYSize();
+//#if GUI_SUPPORT_CURSOR
+//  GUI_CURSOR_Hide();
+//#endif
+//  if (vySize > ySize) {
+//    ClipRect.x0 = 0;
+//    ClipRect.y0 = 0;
+//    ClipRect.x1 = xSize;
+//    ClipRect.y1 = ySize;
+//    GUI_SetClipRect(&ClipRect);
+//  }
+//  GUIDEMO_ShowIntro("High speed",
+//                    "Multi layer clipping\n"
+//                    "Highly optimized drivers");
+  for (i = 0; i< 8; i++) {
+    aColorIndex[i] = GUI_Color2Index(_aColor[i]);
+  }  
+  TimeStart = GUIDEMO_GetTime();
+  for (i = 0; ((GUIDEMO_GetTime() - TimeStart) < 5000); i++) {
+    GUI_SetColorIndex(aColorIndex[i&7]);
+    //
+    // Calculate random positions
+    //
+    Rect.x0 = rand() % xSize - xSize / 2;
+    Rect.y0 = rand() % ySize - ySize / 2;
+    Rect.x1 = Rect.x0 + 20 + rand() % xSize;
+    Rect.y1 = Rect.y0 + 20 + rand() % ySize;
+    GUI_FillRect(Rect.x0, Rect.y0, Rect.x1, Rect.y1);
+    //
+    // Clip rectangle to visible area and add the number of pixels (for speed computation)
+    //
+    if (Rect.x1 >= xSize) {
+      Rect.x1 = xSize - 1;
+    }
+    if (Rect.y1 >= ySize) {
+      Rect.y1 = ySize - 1;
+    }
+    if (Rect.x0 < 0 ) {
+      Rect.x0 = 0;
+    }
+    if (Rect.y1 < 0) {
+      Rect.y1 = 0;
+    }
+    GUI_Exec();
+    //
+    // Allow short breaks so we do not use all available CPU time ...
+    //
+  }
+//  GUIDEMO_NotifyStartNext();
+  PixelsPerSecond = _GetPixelsPerSecond();
+//  GUI_SetClipRect(NULL);
+//  GUIDEMO_DrawBk(0);
+  GUI_SetColor(GUI_BLUE);
+  GUI_SetTextMode(GUI_TM_TRANS);
+//  GUI_DrawBitmap(&bmSTLogo70x35, 5, 5);
+  GUIDEMO_AddStringToString(cText, "Pixels/sec: ");
+  GUIDEMO_AddIntToString(cText, PixelsPerSecond);
+  GUI_DispStringHCenterAt(cText, xSize >> 1, (ySize - GUI_GetFontSizeY()) >> 1);
+//  GUIDEMO_Delay(4000);
+//  GUI_Delay(4000);
+  
+  GUI_SetColor(0x111111);
+  TimeStart = 3000;
+  for (i=0;i<=(x1-x0);i++) {
+    GUI_FillRect(x0, y1, x0+i, y1);
+    GUI_Delay(TimeStart/(x1-x0));
+  }
+  
+  WM_DeleteWindow(videoWin);
+//#if GUI_SUPPORT_CURSOR
+//  GUI_CURSOR_Show();
+//#endif
+}
+
+#else
+
+void GUIDEMO_Speed(void) {}
+
+#endif
+
+/*************************** End of file ****************************/
