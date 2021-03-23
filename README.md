@@ -60,7 +60,7 @@
 <div>
 <img width="240" height="320" src="./PRTSC/PRTSC (10).bmp"/>
 <img width="240" height="320" src="./PRTSC/PRTSC (11).bmp"/>
-<img width="240" height="320" src="./PRTSC/PRTSC (12).bmp"/>
+<img width="240" height="320" src="./PRTSC/PRTSC (25).bmp"/>
 </div>
 <div>
 <img width="240" height="320" src="./PRTSC/PRTSC (13).bmp"/>
@@ -81,9 +81,6 @@
 <img width="240" height="320" src="./PRTSC/PRTSC (22).bmp"/>
 <img width="240" height="320" src="./PRTSC/PRTSC (23).bmp"/>
 <img width="240" height="320" src="./PRTSC/PRTSC (24).bmp"/>
-</div>
-<div>
-<img width="240" height="320" src="./PRTSC/PRTSC (25).bmp"/>
 </div>
 
 
